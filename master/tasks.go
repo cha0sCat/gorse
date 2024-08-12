@@ -79,13 +79,17 @@ func (m *Master) runLoadDatasetTask() error {
 		zap.Strings("read_feedback_types", m.Config.Recommend.DataSource.ReadFeedbackTypes),
 		zap.Uint("item_ttl", m.Config.Recommend.DataSource.ItemTTL),
 		zap.Uint("feedback_ttl", m.Config.Recommend.DataSource.PositiveFeedbackTTL))
+
 	evaluator := NewOnlineEvaluator()
+	log.Logger().Info("[runLoadDatasetTask] NewOnlineEvaluator finished")
+
 	rankingDataset, clickDataset, latestItems, popularItems, err := m.LoadDataFromDatabase(ctx, m.DataClient,
 		m.Config.Recommend.DataSource.PositiveFeedbackTypes,
 		m.Config.Recommend.DataSource.ReadFeedbackTypes,
 		m.Config.Recommend.DataSource.ItemTTL,
 		m.Config.Recommend.DataSource.PositiveFeedbackTTL,
 		evaluator)
+	log.Logger().Info("[runLoadDatasetTask] LoadDataFromDatabase finished")
 	if err != nil {
 		return errors.Trace(err)
 	}
@@ -94,60 +98,75 @@ func (m *Master) runLoadDatasetTask() error {
 	if err = m.CacheClient.AddDocuments(ctx, cache.PopularItems, "", popularItems.ToSlice()); err != nil {
 		log.Logger().Error("failed to cache popular items", zap.Error(err))
 	}
+	log.Logger().Info("[runLoadDatasetTask] AddDocuments(PopularItems) finished")
 	if err = m.CacheClient.DeleteDocuments(ctx, []string{cache.PopularItems}, cache.DocumentCondition{Before: &popularItems.Timestamp}); err != nil {
 		log.Logger().Error("failed to reclaim outdated items", zap.Error(err))
 	}
+	log.Logger().Info("[runLoadDatasetTask] DeleteDocuments(PopularItems) finished")
 	if err = m.CacheClient.Set(ctx, cache.Time(cache.Key(cache.GlobalMeta, cache.LastUpdatePopularItemsTime), time.Now())); err != nil {
 		log.Logger().Error("failed to write latest update popular items time", zap.Error(err))
 	}
+	log.Logger().Info("[runLoadDatasetTask] Set(LastUpdatePopularItemsTime) finished")
 
 	// save the latest items to cache
 	if err = m.CacheClient.AddDocuments(ctx, cache.LatestItems, "", latestItems.ToSlice()); err != nil {
 		log.Logger().Error("failed to cache latest items", zap.Error(err))
 	}
+	log.Logger().Info("[runLoadDatasetTask] AddDocuments(LatestItems) finished")
 	if err = m.CacheClient.DeleteDocuments(ctx, []string{cache.LatestItems}, cache.DocumentCondition{Before: &latestItems.Timestamp}); err != nil {
 		log.Logger().Error("failed to reclaim outdated items", zap.Error(err))
 	}
+	log.Logger().Info("[runLoadDatasetTask] DeleteDocuments(LatestItems) finished")
 	if err = m.CacheClient.Set(ctx, cache.Time(cache.Key(cache.GlobalMeta, cache.LastUpdateLatestItemsTime), time.Now())); err != nil {
 		log.Logger().Error("failed to write latest update latest items time", zap.Error(err))
 	}
+	log.Logger().Info("[runLoadDatasetTask] Set(LastUpdateLatestItemsTime) finished")
 
 	// write statistics to database
 	UsersTotal.Set(float64(rankingDataset.UserCount()))
 	if err = m.CacheClient.Set(ctx, cache.Integer(cache.Key(cache.GlobalMeta, cache.NumUsers), rankingDataset.UserCount())); err != nil {
 		log.Logger().Error("failed to write number of users", zap.Error(err))
 	}
+	log.Logger().Info("[runLoadDatasetTask] Set(NumUsers) finished")
 	ItemsTotal.Set(float64(rankingDataset.ItemCount()))
 	if err = m.CacheClient.Set(ctx, cache.Integer(cache.Key(cache.GlobalMeta, cache.NumItems), rankingDataset.ItemCount())); err != nil {
 		log.Logger().Error("failed to write number of items", zap.Error(err))
 	}
+	log.Logger().Info("[runLoadDatasetTask] Set(NumItems) finished")
 	ImplicitFeedbacksTotal.Set(float64(rankingDataset.Count()))
 	if err = m.CacheClient.Set(ctx, cache.Integer(cache.Key(cache.GlobalMeta, cache.NumTotalPosFeedbacks), rankingDataset.Count())); err != nil {
 		log.Logger().Error("failed to write number of positive feedbacks", zap.Error(err))
 	}
+	log.Logger().Info("[runLoadDatasetTask] Set(NumTotalPosFeedbacks) finished")
 	UserLabelsTotal.Set(float64(clickDataset.Index.CountUserLabels()))
 	if err = m.CacheClient.Set(ctx, cache.Integer(cache.Key(cache.GlobalMeta, cache.NumUserLabels), int(clickDataset.Index.CountUserLabels()))); err != nil {
 		log.Logger().Error("failed to write number of user labels", zap.Error(err))
 	}
+	log.Logger().Info("[runLoadDatasetTask] Set(NumUserLabels) finished")
 	ItemLabelsTotal.Set(float64(clickDataset.Index.CountItemLabels()))
 	if err = m.CacheClient.Set(ctx, cache.Integer(cache.Key(cache.GlobalMeta, cache.NumItemLabels), int(clickDataset.Index.CountItemLabels()))); err != nil {
 		log.Logger().Error("failed to write number of item labels", zap.Error(err))
 	}
+	log.Logger().Info("[runLoadDatasetTask] Set(NumItemLabels) finished")
 	ImplicitFeedbacksTotal.Set(float64(rankingDataset.Count()))
 	PositiveFeedbacksTotal.Set(float64(clickDataset.PositiveCount))
 	if err = m.CacheClient.Set(ctx, cache.Integer(cache.Key(cache.GlobalMeta, cache.NumValidPosFeedbacks), clickDataset.PositiveCount)); err != nil {
 		log.Logger().Error("failed to write number of positive feedbacks", zap.Error(err))
 	}
+	log.Logger().Info("[runLoadDatasetTask] Set(NumValidPosFeedbacks) finished")
 	NegativeFeedbackTotal.Set(float64(clickDataset.NegativeCount))
 	if err = m.CacheClient.Set(ctx, cache.Integer(cache.Key(cache.GlobalMeta, cache.NumValidNegFeedbacks), clickDataset.NegativeCount)); err != nil {
 		log.Logger().Error("failed to write number of negative feedbacks", zap.Error(err))
 	}
+	log.Logger().Info("[runLoadDatasetTask] Set(NumValidNegFeedbacks) finished")
 
 	// evaluate positive feedback rate
 	points := evaluator.Evaluate()
+	log.Logger().Info("[runLoadDatasetTask] Evaluate finished")
 	if err = m.CacheClient.AddTimeSeriesPoints(ctx, points); err != nil {
 		log.Logger().Error("failed to insert measurement", zap.Error(err))
 	}
+	log.Logger().Info("[runLoadDatasetTask] AddTimeSeriesPoints finished")
 
 	// collect active users and items
 	activeUsers, activeItems, inactiveUsers, inactiveItems := 0, 0, 0, 0
@@ -170,27 +189,41 @@ func (m *Master) runLoadDatasetTask() error {
 	InactiveUsersTotal.Set(float64(inactiveUsers))
 	InactiveItemsTotal.Set(float64(inactiveItems))
 
+	log.Logger().Info("ActiveUsersTotal", zap.Int("ActiveUsersTotal", activeUsers))
+	log.Logger().Info("ActiveItemsTotal", zap.Int("ActiveItemsTotal", activeItems))
+	log.Logger().Info("InactiveUsersTotal", zap.Int("InactiveUsersTotal", inactiveUsers))
+	log.Logger().Info("InactiveItemsTotal", zap.Int("InactiveItemsTotal", inactiveItems))
+
 	// write categories to cache
 	if err = m.CacheClient.SetSet(ctx, cache.ItemCategories, rankingDataset.CategorySet.ToSlice()...); err != nil {
 		log.Logger().Error("failed to write categories to cache", zap.Error(err))
 	}
+	log.Logger().Info("[runLoadDatasetTask] SetSet(ItemCategories) finished")
 
 	// split ranking dataset
 	startTime := time.Now()
+	log.Logger().Info("[runLoadDatasetTask] split ranking dataset, try get lock")
 	m.rankingDataMutex.Lock()
+	log.Logger().Info("[runLoadDatasetTask] split ranking dataset, got lock")
 	m.rankingTrainSet, m.rankingTestSet = rankingDataset.Split(0, 0)
+	log.Logger().Info("[runLoadDatasetTask] split ranking dataset, split finished")
 	rankingDataset = nil
 	m.rankingDataMutex.Unlock()
+	log.Logger().Info("[runLoadDatasetTask] split ranking dataset, release lock")
 	LoadDatasetStepSecondsVec.WithLabelValues("split_ranking_dataset").Set(time.Since(startTime).Seconds())
 	MemoryInUseBytesVec.WithLabelValues("collaborative_filtering_train_set").Set(float64(m.rankingTrainSet.Bytes()))
 	MemoryInUseBytesVec.WithLabelValues("collaborative_filtering_test_set").Set(float64(m.rankingTestSet.Bytes()))
 
 	// split click dataset
 	startTime = time.Now()
+	log.Logger().Info("[runLoadDatasetTask] split click dataset, try get lock")
 	m.clickDataMutex.Lock()
+	log.Logger().Info("[runLoadDatasetTask] split click dataset, got lock")
 	m.clickTrainSet, m.clickTestSet = clickDataset.Split(0.2, 0)
+	log.Logger().Info("[runLoadDatasetTask] split click dataset, split finished")
 	clickDataset = nil
 	m.clickDataMutex.Unlock()
+	log.Logger().Info("[runLoadDatasetTask] split click dataset, release lock")
 	LoadDatasetStepSecondsVec.WithLabelValues("split_click_dataset").Set(time.Since(startTime).Seconds())
 	MemoryInUseBytesVec.WithLabelValues("ranking_train_set").Set(float64(sizeof.DeepSize(m.clickTrainSet)))
 	MemoryInUseBytesVec.WithLabelValues("ranking_test_set").Set(float64(sizeof.DeepSize(m.clickTestSet)))

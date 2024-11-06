@@ -345,7 +345,7 @@ func (m MongoDB) Remain(ctx context.Context, name string) (int64, error) {
 	})
 }
 
-func (m MongoDB) AddDocuments(ctx context.Context, collection, subset string, documents []Document) error {
+func (m MongoDB) AddScores(ctx context.Context, collection, subset string, documents []Score) error {
 	if len(documents) == 0 {
 		return nil
 	}
@@ -369,7 +369,7 @@ func (m MongoDB) AddDocuments(ctx context.Context, collection, subset string, do
 	return errors.Trace(err)
 }
 
-func (m MongoDB) SearchDocuments(ctx context.Context, collection, subset string, query []string, begin, end int) ([]Document, error) {
+func (m MongoDB) SearchScores(ctx context.Context, collection, subset string, query []string, begin, end int) ([]Score, error) {
 	if len(query) == 0 {
 		return nil, nil
 	}
@@ -386,9 +386,9 @@ func (m MongoDB) SearchDocuments(ctx context.Context, collection, subset string,
 	if err != nil {
 		return nil, errors.Trace(err)
 	}
-	documents := make([]Document, 0)
+	documents := make([]Score, 0)
 	for cur.Next(ctx) {
-		var document Document
+		var document Score
 		if err = cur.Decode(&document); err != nil {
 			return nil, errors.Trace(err)
 		}
@@ -397,7 +397,7 @@ func (m MongoDB) SearchDocuments(ctx context.Context, collection, subset string,
 	return documents, nil
 }
 
-func (m MongoDB) UpdateDocuments(ctx context.Context, collections []string, id string, patch DocumentPatch) error {
+func (m MongoDB) UpdateScores(ctx context.Context, collections []string, id string, patch ScorePatch) error {
 	if len(collections) == 0 {
 		return nil
 	}
@@ -423,7 +423,7 @@ func (m MongoDB) UpdateDocuments(ctx context.Context, collections []string, id s
 	return errors.Trace(err)
 }
 
-func (m MongoDB) DeleteDocuments(ctx context.Context, collections []string, condition DocumentCondition) error {
+func (m MongoDB) DeleteScores(ctx context.Context, collections []string, condition ScoreCondition) error {
 	if err := condition.Check(); err != nil {
 		return errors.Trace(err)
 	}

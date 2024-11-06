@@ -95,11 +95,11 @@ func (m *Master) runLoadDatasetTask() error {
 	}
 
 	// save popular items to cache
-	if err = m.CacheClient.AddDocuments(ctx, cache.PopularItems, "", popularItems.ToSlice()); err != nil {
+	if err = m.CacheClient.AddScores(ctx, cache.PopularItems, "", popularItems.ToSlice()); err != nil {
 		log.Logger().Error("failed to cache popular items", zap.Error(err))
 	}
 	log.Logger().Info("[runLoadDatasetTask] AddDocuments(PopularItems) finished")
-	if err = m.CacheClient.DeleteDocuments(ctx, []string{cache.PopularItems}, cache.DocumentCondition{Before: &popularItems.Timestamp}); err != nil {
+	if err = m.CacheClient.DeleteScores(ctx, []string{cache.PopularItems}, cache.ScoreCondition{Before: &popularItems.Timestamp}); err != nil {
 		log.Logger().Error("failed to reclaim outdated items", zap.Error(err))
 	}
 	log.Logger().Info("[runLoadDatasetTask] DeleteDocuments(PopularItems) finished")
@@ -109,11 +109,11 @@ func (m *Master) runLoadDatasetTask() error {
 	log.Logger().Info("[runLoadDatasetTask] Set(LastUpdatePopularItemsTime) finished")
 
 	// save the latest items to cache
-	if err = m.CacheClient.AddDocuments(ctx, cache.LatestItems, "", latestItems.ToSlice()); err != nil {
+	if err = m.CacheClient.AddScores(ctx, cache.LatestItems, "", latestItems.ToSlice()); err != nil {
 		log.Logger().Error("failed to cache latest items", zap.Error(err))
 	}
 	log.Logger().Info("[runLoadDatasetTask] AddDocuments(LatestItems) finished")
-	if err = m.CacheClient.DeleteDocuments(ctx, []string{cache.LatestItems}, cache.DocumentCondition{Before: &latestItems.Timestamp}); err != nil {
+	if err = m.CacheClient.DeleteScores(ctx, []string{cache.LatestItems}, cache.ScoreCondition{Before: &latestItems.Timestamp}); err != nil {
 		log.Logger().Error("failed to reclaim outdated items", zap.Error(err))
 	}
 	log.Logger().Info("[runLoadDatasetTask] DeleteDocuments(LatestItems) finished")
@@ -430,10 +430,10 @@ func (m *Master) findItemNeighborsBruteForce(dataset *ranking.DataSet, labeledIt
 			}
 			aggregator.Add(category, recommends, scores)
 		}
-		if err := m.CacheClient.AddDocuments(ctx, cache.ItemNeighbors, itemId, aggregator.ToSlice()); err != nil {
+		if err := m.CacheClient.AddScores(ctx, cache.ItemNeighbors, itemId, aggregator.ToSlice()); err != nil {
 			return errors.Trace(err)
 		}
-		if err := m.CacheClient.DeleteDocuments(ctx, []string{cache.ItemNeighbors}, cache.DocumentCondition{
+		if err := m.CacheClient.DeleteScores(ctx, []string{cache.ItemNeighbors}, cache.ScoreCondition{
 			Subset: proto.String(itemId),
 			Before: &aggregator.Timestamp,
 		}); err != nil {
@@ -535,10 +535,10 @@ func (m *Master) findItemNeighborsIVF(dataset *ranking.DataSet, labelIDF, userID
 				aggregator.Add(category, resultValues, resultScores)
 			}
 		}
-		if err := m.CacheClient.AddDocuments(ctx, cache.ItemNeighbors, itemId, aggregator.ToSlice()); err != nil {
+		if err := m.CacheClient.AddScores(ctx, cache.ItemNeighbors, itemId, aggregator.ToSlice()); err != nil {
 			return errors.Trace(err)
 		}
-		if err := m.CacheClient.DeleteDocuments(ctx, []string{cache.ItemNeighbors}, cache.DocumentCondition{
+		if err := m.CacheClient.DeleteScores(ctx, []string{cache.ItemNeighbors}, cache.ScoreCondition{
 			Subset: proto.String(itemId),
 			Before: &aggregator.Timestamp,
 		}); err != nil {
@@ -749,10 +749,10 @@ func (m *Master) findUserNeighborsBruteForce(ctx context.Context, dataset *ranki
 		}
 		aggregator := cache.NewDocumentAggregator(startSearchTime)
 		aggregator.Add("", recommends, scores)
-		if err := m.CacheClient.AddDocuments(ctx, cache.UserNeighbors, userId, aggregator.ToSlice()); err != nil {
+		if err := m.CacheClient.AddScores(ctx, cache.UserNeighbors, userId, aggregator.ToSlice()); err != nil {
 			return errors.Trace(err)
 		}
-		if err := m.CacheClient.DeleteDocuments(ctx, []string{cache.UserNeighbors}, cache.DocumentCondition{
+		if err := m.CacheClient.DeleteScores(ctx, []string{cache.UserNeighbors}, cache.ScoreCondition{
 			Subset: proto.String(userId),
 			Before: &aggregator.Timestamp,
 		}); err != nil {
@@ -841,10 +841,10 @@ func (m *Master) findUserNeighborsIVF(ctx context.Context, dataset *ranking.Data
 		}
 		aggregator := cache.NewDocumentAggregator(startSearchTime)
 		aggregator.Add("", resultValues, resultScores)
-		if err := m.CacheClient.AddDocuments(ctx, cache.UserNeighbors, userId, aggregator.ToSlice()); err != nil {
+		if err := m.CacheClient.AddScores(ctx, cache.UserNeighbors, userId, aggregator.ToSlice()); err != nil {
 			return errors.Trace(err)
 		}
-		if err := m.CacheClient.DeleteDocuments(ctx, []string{cache.UserNeighbors}, cache.DocumentCondition{
+		if err := m.CacheClient.DeleteScores(ctx, []string{cache.UserNeighbors}, cache.ScoreCondition{
 			Subset: proto.String(userId),
 			Before: &aggregator.Timestamp,
 		}); err != nil {
@@ -905,7 +905,7 @@ func (m *Master) checkUserNeighborCacheTimeout(userId string) bool {
 	)
 	ctx := context.Background()
 	// check cache
-	if items, err := m.CacheClient.SearchDocuments(ctx, cache.UserNeighbors, userId, []string{""}, 0, -1); err != nil {
+	if items, err := m.CacheClient.SearchScores(ctx, cache.UserNeighbors, userId, []string{""}, 0, -1); err != nil {
 		log.Logger().Error("failed to load user neighbors", zap.String("user_id", userId), zap.Error(err))
 		return true
 	} else if len(items) == 0 {
@@ -960,7 +960,7 @@ func (m *Master) checkItemNeighborCacheTimeout(itemId string, categories []strin
 
 	// check cache
 	for _, category := range append([]string{""}, categories...) {
-		items, err := m.CacheClient.SearchDocuments(ctx, cache.ItemNeighbors, itemId, []string{category}, 0, -1)
+		items, err := m.CacheClient.SearchScores(ctx, cache.ItemNeighbors, itemId, []string{category}, 0, -1)
 		if err != nil {
 			log.Logger().Error("failed to load item neighbors", zap.String("item_id", itemId), zap.Error(err))
 			return true

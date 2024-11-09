@@ -16,6 +16,7 @@ package cache
 
 import (
 	"context"
+	"github.com/zhenghaoz/gorse/base/log"
 	"io"
 	"time"
 
@@ -33,6 +34,8 @@ type MongoDB struct {
 }
 
 func (m MongoDB) Init() error {
+	log.Logger().Info("[cache/mongodb Init] Init mongodb cache")
+
 	ctx := context.Background()
 	d := m.client.Database(m.dbName)
 	// list collections
@@ -60,7 +63,9 @@ func (m MongoDB) Init() error {
 			return errors.Trace(err)
 		}
 	}
+
 	// create index
+	log.Logger().Info("[cache/mongodb Init] Create indexes for SetsTable")
 	_, err = d.Collection(m.SetsTable()).Indexes().CreateOne(ctx, mongo.IndexModel{
 		Keys: bson.D{
 			{"name", 1},
@@ -71,6 +76,8 @@ func (m MongoDB) Init() error {
 	if err != nil {
 		return errors.Trace(err)
 	}
+
+	log.Logger().Info("[cache/mongodb Init] Create indexes for ValuesTable")
 	_, err = d.Collection(m.MessageTable()).Indexes().CreateMany(ctx, []mongo.IndexModel{
 		{
 			// update set ... where name = ? and value = ?
@@ -90,6 +97,8 @@ func (m MongoDB) Init() error {
 	if err != nil {
 		return errors.Trace(err)
 	}
+
+	log.Logger().Info("[cache/mongodb Init] Create indexes for DocumentTable")
 	_, err = d.Collection(m.DocumentTable()).Indexes().CreateMany(ctx, []mongo.IndexModel{
 		{
 			Keys: bson.D{
@@ -111,6 +120,8 @@ func (m MongoDB) Init() error {
 	if err != nil {
 		return errors.Trace(err)
 	}
+
+	log.Logger().Info("[cache/mongodb Init] Create indexes for PointsTable")
 	_, err = d.Collection(m.PointsTable()).Indexes().CreateMany(ctx, []mongo.IndexModel{
 		{
 			// update set ... where name = ? and timestammp = ?
@@ -123,6 +134,8 @@ func (m MongoDB) Init() error {
 	if err != nil {
 		return errors.Trace(err)
 	}
+
+	log.Logger().Info("[cache/mongodb Init] All indexes created")
 	return nil
 }
 

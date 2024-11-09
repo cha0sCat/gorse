@@ -1343,8 +1343,11 @@ func (s *RestServer) batchInsertItems(ctx context.Context, response *restful.Res
 		insertItemsTime      time.Duration
 		insertCacheTime      time.Duration
 	)
+	log.Logger().Info("[batchInsertItems] batch insert items", zap.Int("num_items", len(temp)))
+
 	// load existed items
 	start := time.Now()
+	stepStart := time.Now()
 	existedItems, err := s.DataClient.BatchGetItems(ctx, lo.Map(temp, func(t Item, i int) string {
 		return t.ItemId
 	}))
@@ -1357,9 +1360,12 @@ func (s *RestServer) batchInsertItems(ctx context.Context, response *restful.Res
 		existedItemsSet[item.ItemId] = item
 	}
 	loadExistedItemsTime = time.Since(start)
+	log.Logger().Info("[batchInsertItems] BatchGetItems", zap.Duration("time", time.Since(stepStart)))
 
 	start = time.Now()
 	for _, item := range temp {
+		log.Logger().Info("[batchInsertItems] process item", zap.String("item_id", item.ItemId))
+
 		// parse datetime
 		var timestamp time.Time
 		var err error
@@ -1377,7 +1383,9 @@ func (s *RestServer) batchInsertItems(ctx context.Context, response *restful.Res
 			Labels:     item.Labels,
 			Comment:    item.Comment,
 		})
+
 		// insert to latest items cache
+		stepStart = time.Now()
 		if err = s.CacheClient.AddDocuments(ctx, cache.LatestItems, "", []cache.Document{{
 			Id:         item.ItemId,
 			Score:      float64(timestamp.Unix()),
@@ -1387,7 +1395,12 @@ func (s *RestServer) batchInsertItems(ctx context.Context, response *restful.Res
 			InternalServerError(response, err)
 			return
 		}
+		log.Logger().Info("[batchInsertItems] add to latest items cache",
+			zap.String("item_id", item.ItemId),
+			zap.Duration("time", time.Since(stepStart)))
+
 		// update items cache
+		stepStart = time.Now()
 		if err = s.CacheClient.UpdateDocuments(ctx, cache.ItemCache, item.ItemId, cache.DocumentPatch{
 			Categories: withWildCard(item.Categories),
 			IsHidden:   &item.IsHidden,
@@ -1395,9 +1408,15 @@ func (s *RestServer) batchInsertItems(ctx context.Context, response *restful.Res
 			InternalServerError(response, err)
 			return
 		}
+		log.Logger().Info("[batchInsertItems] update items cache",
+			zap.String("item_id", item.ItemId),
+			zap.Duration("time", time.Since(stepStart)))
+		stepStart = time.Now()
+
 		count++
 	}
 	parseTimesatmpTime = time.Since(start)
+	log.Logger().Info("[batchInsertItems] parse timestamp", zap.Duration("time", parseTimesatmpTime))
 
 	// insert items
 	start = time.Now()
@@ -1406,6 +1425,7 @@ func (s *RestServer) batchInsertItems(ctx context.Context, response *restful.Res
 		return
 	}
 	insertItemsTime = time.Since(start)
+	log.Logger().Info("[batchInsertItems] batch insert items", zap.Duration("time", insertItemsTime))
 
 	// insert modify timestamp
 	start = time.Now()
@@ -1415,15 +1435,23 @@ func (s *RestServer) batchInsertItems(ctx context.Context, response *restful.Res
 		values[i] = cache.Time(cache.Key(cache.LastModifyItemTime, item.ItemId), time.Now())
 		categories.Append(item.Categories...)
 	}
+	stepStart = time.Now()
 	if err = s.CacheClient.Set(ctx, values...); err != nil {
 		InternalServerError(response, err)
 		return
 	}
+	log.Logger().Info("[batchInsertItems] set modify timestamp",
+		zap.Duration("time", time.Since(stepStart)),
+		zap.Int("num_items", len(items)))
+
 	// insert categories
+	stepStart = time.Now()
 	if err = s.CacheClient.AddSet(ctx, cache.ItemCategories, categories.ToSlice()...); err != nil {
 		InternalServerError(response, err)
 		return
 	}
+	log.Logger().Info("[batchInsertItems] add categories",
+		zap.Duration("time", time.Since(stepStart)))
 
 	insertCacheTime = time.Since(start)
 	log.ResponseLogger(response).Info("batch insert items",

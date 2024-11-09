@@ -1463,6 +1463,8 @@ func (s *RestServer) batchInsertItems(ctx context.Context, response *restful.Res
 }
 
 func (s *RestServer) insertItems(request *restful.Request, response *restful.Response) {
+	log.Logger().Info("[insertItems] insert items batchInsertItems")
+
 	ctx := context.Background()
 	if request != nil && request.Request != nil {
 		ctx = request.Request.Context()
@@ -1484,6 +1486,8 @@ func (s *RestServer) insertItems(request *restful.Request, response *restful.Res
 }
 
 func (s *RestServer) insertItem(request *restful.Request, response *restful.Response) {
+	log.Logger().Info("[insertItem] insert item batchInsertItems")
+
 	ctx := context.Background()
 	if request != nil && request.Request != nil {
 		ctx = request.Request.Context()

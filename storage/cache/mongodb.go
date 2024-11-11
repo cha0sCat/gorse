@@ -404,20 +404,22 @@ func (m MongoDB) UpdateDocuments(ctx context.Context, collections []string, id s
 	if patch.IsHidden == nil && patch.Categories == nil && patch.Score == nil {
 		return nil
 	}
-	update := bson.D{}
+
+	setFields := bson.M{}
 	if patch.IsHidden != nil {
-		update = append(update, bson.E{Key: "$set", Value: bson.M{"is_hidden": *patch.IsHidden}})
+		setFields["is_hidden"] = *patch.IsHidden
 	}
 	if patch.Categories != nil {
-		update = append(update, bson.E{Key: "$set", Value: bson.M{"categories": patch.Categories}})
+		setFields["categories"] = patch.Categories
 	}
 	if patch.Score != nil {
-		update = append(update, bson.E{Key: "$set", Value: bson.M{"score": *patch.Score}})
+		setFields["score"] = *patch.Score
 	}
+
 	_, err := m.client.Database(m.dbName).Collection(m.DocumentTable()).UpdateMany(ctx, bson.M{
 		"collection": bson.M{"$in": collections},
 		"id":         id,
-	}, update)
+	}, bson.M{"$set": setFields})
 	return errors.Trace(err)
 }
 

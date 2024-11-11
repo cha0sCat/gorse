@@ -114,6 +114,14 @@ func (m MongoDB) Init() error {
 				{"id", 1},
 			},
 		},
+		// for DeleteDocuments
+		{
+			Keys: bson.D{
+				{"collection", 1},
+				{"timestamp", 1},
+				{"subset", 1},
+			},
+		},
 		{
 			Keys: bson.D{
 				{"collection", 1},

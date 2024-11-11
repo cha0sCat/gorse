@@ -107,6 +107,13 @@ func (m MongoDB) Init() error {
 				{"id", 1},
 			},
 		},
+		// for UpdateDocuments
+		{
+			Keys: bson.D{
+				{"collection", 1},
+				{"id", 1},
+			},
+		},
 		{
 			Keys: bson.D{
 				{"collection", 1},

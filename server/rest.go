@@ -1400,19 +1400,18 @@ func (s *RestServer) batchInsertItems(ctx context.Context, response *restful.Res
 			zap.Duration("time", time.Since(stepStart)))
 
 		// update items cache
-		if _, ok := existedItemsSet[item.ItemId]; ok {
-			stepStart = time.Now()
-			if err = s.CacheClient.UpdateDocuments(ctx, cache.ItemCache, item.ItemId, cache.DocumentPatch{
-				Categories: withWildCard(item.Categories),
-				IsHidden:   &item.IsHidden,
-			}); err != nil {
-				InternalServerError(response, err)
-				return
-			}
-			log.Logger().Info("[batchInsertItems] update items cache",
-				zap.String("item_id", item.ItemId),
-				zap.Duration("time", time.Since(stepStart)))
+		stepStart = time.Now()
+		if err = s.CacheClient.UpdateDocuments(ctx, cache.ItemCache, item.ItemId, cache.DocumentPatch{
+			Categories: withWildCard(item.Categories),
+			IsHidden:   &item.IsHidden,
+		}); err != nil {
+			InternalServerError(response, err)
+			return
 		}
+		log.Logger().Info("[batchInsertItems] update items cache",
+			zap.String("item_id", item.ItemId),
+			zap.Duration("time", time.Since(stepStart)))
+		stepStart = time.Now()
 
 		count++
 	}

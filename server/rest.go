@@ -1411,7 +1411,6 @@ func (s *RestServer) batchInsertItems(ctx context.Context, response *restful.Res
 		log.Logger().Info("[batchInsertItems] update items cache",
 			zap.String("item_id", item.ItemId),
 			zap.Duration("time", time.Since(stepStart)))
-		stepStart = time.Now()
 
 		count++
 	}
